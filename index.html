@@ -20,7 +20,7 @@ h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transfo
 .tr{background:#0b0f14;border-radius:10px;padding:6px 12px;text-align:center;margin-bottom:6px}
 .tr small{display:block;font-size:11px;color:var(--mu)}.tr b{font-size:26px}
 .nt{color:#ffb54d;font-size:12px;margin-top:6px;line-height:1.35}
-.card{flex-wrap:wrap}.card .nt{width:100%}
+.card{flex-wrap:wrap;gap:8px}.card>div:first-child{flex:1;min-width:0}.r{flex-shrink:0}.card .nt{width:100%}
 .r{text-align:right;color:var(--mu);font-size:14px}
 .r b{display:block;font-size:20px;color:var(--ok)}
 .d{color:var(--mu);font-size:13px;margin-top:2px}
@@ -94,7 +94,7 @@ function render(el,list){
     if(d.cancel)st='<div class="st bad">Inställt</div>';
     else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
     else if(d.rt)st='<div class="st ok">I tid</div>';
-    else st='<div class="st gr">Planerad tid – ingen realtidsdata ännu</div>';
+    else st='<div class="st gr">Ingen realtid ännu</div>';
     const chg=d.track&&d.oldTrack&&d.track!==d.oldTrack;
     const tr=d.track?`<div class="tr"><small>${chg?"ändrat spår":"spår"}</small><b>${d.track}</b></div>`:"";
     const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
