@@ -49,7 +49,7 @@ a{color:var(--ac)}
 <script>
 const $=id=>document.getElementById(id);
 const URL_="https://api.trafikinfo.trafikverket.se/v2/data.json";
-let KEY=null,LAST=[],NAMES={G:"Göteborg C",Hm:"Halmstad C"},timer;
+let KEY=null,LAST=[],NAMES={G:"Göteborg C",Hd:"Halmstad C"},timer;
 try{KEY=localStorage.getItem("tv_key")}catch(e){}
 function saveKey(){KEY=$("key").value.trim();if(!KEY)return;try{localStorage.setItem("tv_key",KEY)}catch(e){}start()}
 function resetKey(){try{localStorage.removeItem("tv_key")}catch(e){}KEY=null;start()}
@@ -102,7 +102,7 @@ function render(el,list){
 }
 async function refresh(){
   try{
-    const [ra,rb]=await Promise.all([fetchDeps("Hm"),fetchDeps("G")]);
+    const [ra,rb]=await Promise.all([fetchDeps("Hd"),fetchDeps("G")]);
     const a=pick(ra,s=>s.includes("G")),b=pick(rb,()=>true);
     await loadNames([...a,...b].map(x=>x.dest).filter(Boolean));
     render($("a"),a);render($("b"),b);
