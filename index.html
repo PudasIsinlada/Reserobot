@@ -12,18 +12,18 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
 h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.05em}
-.card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.card>div:first-child{flex:1;min-width:0}
 .t{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums}
 .t s{font-size:20px;color:var(--bad);margin-right:6px;font-weight:500}
+.r{text-align:right;color:var(--mu);font-size:14px;flex-shrink:0}
+.r b{display:block;font-size:20px;color:var(--ok)}
+.d{color:var(--mu);font-size:13px;margin-top:2px}
 .st{font-size:15px;font-weight:600;margin-top:4px}
 .ok{color:var(--ok)}.warn{color:#ffb54d}.bad{color:var(--bad)}.gr{color:var(--mu)}
 .tr{background:#0b0f14;border-radius:10px;padding:6px 12px;text-align:center;margin-bottom:6px}
-.tr small{display:block;font-size:11px;color:var(--mu)}.tr b{font-size:26px}
-.nt{color:#ffb54d;font-size:12px;margin-top:6px;line-height:1.35}
-.card{flex-wrap:wrap;gap:8px}.card>div:first-child{flex:1;min-width:0}.r{flex-shrink:0}.card .nt{width:100%}
-.r{text-align:right;color:var(--mu);font-size:14px}
-.r b{display:block;font-size:20px;color:var(--ok)}
-.d{color:var(--mu);font-size:13px;margin-top:2px}
+.tr small{display:block;font-size:11px;color:var(--mu)}.tr b{font-size:26px;color:var(--tx)}
+.nt{color:#ffb54d;font-size:12px;margin-top:6px;line-height:1.35;width:100%}
 #st{color:var(--mu);font-size:12px;text-align:center;margin-top:14px}
 #set{display:none}
 input{width:100%;padding:12px;border-radius:10px;border:0;background:var(--card);color:var(--tx);font-size:16px;margin:8px 0}
@@ -35,7 +35,7 @@ a{color:var(--ac)}
 <body>
 <div id="set">
   <h2>Inställning</h2>
-  <p>Skaffa en gratis nyckel för <b>ResRobot – Resplanerare och Tidtabeller</b> på <a href="https://www.trafiklab.se">trafiklab.se</a> och klistra in den här.</p>
+  <p>Klistra in din API-nyckel för <b>Trafikverket Öppet API</b> (hämtas via Trafiklab eller data.trafikverket.se).</p>
   <input id="key" placeholder="API-nyckel" autocapitalize="off" autocorrect="off">
   <button onclick="saveKey()">Spara</button>
 </div>
@@ -43,47 +43,47 @@ a{color:var(--ac)}
   <h2>Halmstad → Göteborg</h2><div id="a"></div>
   <h2>Göteborg → Halmstad</h2><div id="b"></div>
   <div id="st"></div>
-  <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button> <button class="lnk" onclick="dbg()">Visa rådata</button><pre id="dbg" style="display:none;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;color:var(--mu)"></pre></div>
+  <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button> <button class="lnk" onclick="dbg()">Visa rådata</button>
+  <pre id="dbg" style="display:none;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;color:var(--mu)"></pre></div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
-const BASE="https://api.resrobot.se/v2.1/";
-let KEY=null;
-try{KEY=localStorage.getItem("rr_key")}catch(e){}
-function saveKey(){KEY=$("key").value.trim();if(!KEY)return;try{localStorage.setItem("rr_key",KEY)}catch(e){}start()}
-function resetKey(){try{localStorage.removeItem("rr_key");localStorage.removeItem("rr_ids")}catch(e){}KEY=null;start()}
-async function getJSON(u){const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
-async function stopId(name){
-  let ids={};try{ids=JSON.parse(localStorage.getItem("rr_ids")||"{}")}catch(e){}
-  if(ids[name])return ids[name];
-  const j=await getJSON(`${BASE}location.name?input=${encodeURIComponent(name)}&format=json&accessId=${KEY}`);
-  const s=(j.stopLocationOrCoordLocation||[]).map(x=>x.StopLocation).find(Boolean);
-  if(!s)throw new Error("Hittar inte "+name);
-  ids[name]=s.extId;try{localStorage.setItem("rr_ids",JSON.stringify(ids))}catch(e){}
-  return s.extId;
+const URL_="https://api.trafikinfo.trafikverket.se/v2/data.json";
+let KEY=null,LAST=[],NAMES={G:"Göteborg C",Hm:"Halmstad C"},timer;
+try{KEY=localStorage.getItem("tv_key")}catch(e){}
+function saveKey(){KEY=$("key").value.trim();if(!KEY)return;try{localStorage.setItem("tv_key",KEY)}catch(e){}start()}
+function resetKey(){try{localStorage.removeItem("tv_key")}catch(e){}KEY=null;start()}
+function dbg(){const e=$("dbg");if(e.style.display==="block"){e.style.display="none";return}e.textContent=JSON.stringify(LAST,null,1).slice(0,3500);e.style.display="block"}
+async function q(xml){
+  const r=await fetch(URL_,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
+  const j=await r.json();const res=j.RESPONSE&&j.RESPONSE.RESULT&&j.RESPONSE.RESULT[0];
+  if(!res)throw new Error("Tomt svar");
+  if(res.ERROR)throw new Error(res.ERROR.MESSAGE||"API-fel");
+  return res;
 }
-function conv(raw,keep){
-  return raw.filter(d=>{
-    const p=(d.ProductAtStop&&d.ProductAtStop.name||d.name||"")+" "+(d.ProductAtStop&&d.ProductAtStop.operator||"");
-    return /öresund/i.test(p)&&keep(d.direction||"")
-  }).map(d=>{
-    const sched=new Date(`${d.date}T${d.time}`);
-    const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
-    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t)&&DIS.test(t))n.push(t)});
-    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3),raw:d}
-  }).filter(d=>d.real.getTime()>=Date.now()-30000).sort((x,y)=>x.real-y.real).slice(0,2);
+async function fetchDeps(sig){
+  const res=await q(`<REQUEST><LOGIN authenticationkey="${KEY}"/><QUERY objecttype="TrainAnnouncement" schemaversion="1.9" orderby="AdvertisedTimeAtLocation"><FILTER><AND><EQ name="ActivityType" value="Avgang"/><EQ name="LocationSignature" value="${sig}"/><GT name="AdvertisedTimeAtLocation" value="$dateadd(-00:30:00)"/><LT name="AdvertisedTimeAtLocation" value="$dateadd(12:00:00)"/></AND></FILTER><INCLUDE>AdvertisedTrainIdent</INCLUDE><INCLUDE>AdvertisedTimeAtLocation</INCLUDE><INCLUDE>EstimatedTimeAtLocation</INCLUDE><INCLUDE>TimeAtLocation</INCLUDE><INCLUDE>TrackAtLocation</INCLUDE><INCLUDE>Canceled</INCLUDE><INCLUDE>Deviation</INCLUDE><INCLUDE>ProductInformation</INCLUDE><INCLUDE>InformationOwner</INCLUDE><INCLUDE>ToLocation</INCLUDE></QUERY></REQUEST>`);
+  return res.TrainAnnouncement||[];
 }
-async function board(name,keep,dirName){
-  const id=await stopId(name);
-  const get=async q=>{const j=await getJSON(`${BASE}departureBoard?id=${id}&format=json&accessId=${KEY}&duration=720&maxJourneys=250${q}`);return j.Departure||[]};
-  if(dirName){
-    const did=await stopId(dirName);
-    const r=conv(await get("&direction="+did),()=>true);
-    if(r.length)return r;
-  }
-  return conv(await get(""),keep);
+async function loadNames(sigs){
+  const need=sigs.filter(s=>!NAMES[s]);if(!need.length)return;
+  try{
+    const res=await q(`<REQUEST><LOGIN authenticationkey="${KEY}"/><QUERY objecttype="TrainStation" schemaversion="1.4"><FILTER><IN name="LocationSignature" value="${need.join(",")}"/></FILTER><INCLUDE>LocationSignature</INCLUDE><INCLUDE>AdvertisedShortLocationName</INCLUDE></QUERY></REQUEST>`);
+    (res.TrainStation||[]).forEach(s=>{NAMES[s.LocationSignature]=s.AdvertisedShortLocationName});
+  }catch(e){}
 }
-const DIS=/inställ|försen|ersätt|buss|störning|avvik|spårändr|ändrat|avbryt|banarbete|kortare|färre|skad|olycka|tidtabell|signalfel|fordonsfel|hastighet|stopp/i;
+const isOre=d=>/öresund/i.test(JSON.stringify(d.ProductInformation||"")+" "+(d.InformationOwner||""));
+const toSigs=d=>(d.ToLocation||[]).slice().sort((x,y)=>(x.Order||0)-(y.Order||0)).map(x=>x.LocationName);
+function pick(raw,keep){
+  const now=Date.now();
+  return raw.filter(d=>isOre(d)&&keep(toSigs(d))&&!d.TimeAtLocation).map(d=>{
+    const sched=new Date(d.AdvertisedTimeAtLocation);
+    const real=d.EstimatedTimeAtLocation?new Date(d.EstimatedTimeAtLocation):sched;
+    const notes=[];(d.Deviation||[]).forEach(x=>{const t=x.Description||x;if(t&&typeof t==="string"&&!notes.includes(t))notes.push(t)});
+    const s=toSigs(d);
+    return{sched,real,est:!!d.EstimatedTimeAtLocation,track:d.TrackAtLocation,cancel:!!d.Canceled,notes:notes.slice(0,3),dest:s[s.length-1],raw:d}
+  }).filter(d=>d.cancel?d.sched.getTime()>=now-60000:d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
+}
 const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
 function render(el,list){
   if(!list.length){el.innerHTML='<div class="card"><span class="d">Inga avgångar hittades</span></div>';return}
@@ -93,26 +93,23 @@ function render(el,list){
     let st;
     if(d.cancel)st='<div class="st bad">Inställt</div>';
     else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
-    else if(d.rt)st='<div class="st ok">I tid</div>';
-    else st='<div class="st gr">Ingen realtid ännu</div>';
-    const chg=d.track&&d.oldTrack&&d.track!==d.oldTrack;
-    const tr=d.track?`<div class="tr"><small>${chg?"ändrat spår":"spår"}</small><b>${d.track}</b></div>`:"";
+    else if(d.est)st='<div class="st ok">I tid</div>';
+    else st='<div class="st gr">Ingen avvikelse rapporterad</div>';
+    const tr=d.track?`<div class="tr"><small>spår</small><b>${d.track}</b></div>`:"";
     const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
-    return `<div class="card"><div><div class="t">${late>=1?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div>${st}<div class="d">mot ${d.dir}</div></div><div class="r">${tr}<b>${d.cancel?"":(min<1?"nu":min+" min")}</b></div>${nt}</div>`
+    return `<div class="card"><div><div class="t">${late>=1?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div>${st}<div class="d">mot ${NAMES[d.dest]||d.dest||""}</div></div><div class="r">${tr}<b>${d.cancel?"":(min<1?"nu":min+" min")}</b></div>${nt}</div>`
   }).join("");
 }
 async function refresh(){
   try{
-    const [a,b]=await Promise.all([
-      board("Halmstad C",x=>/göteborg/i.test(x),"Göteborg C"),
-      board("Göteborg C",x=>!/göteborg/i.test(x))
-    ]);
-    render($("a"),a);render($("b"),b);LAST=[a[0],b[0]].filter(Boolean).map(x=>x.raw);
+    const [ra,rb]=await Promise.all([fetchDeps("Hm"),fetchDeps("G")]);
+    const a=pick(ra,s=>s.includes("G")),b=pick(rb,()=>true);
+    await loadNames([...a,...b].map(x=>x.dest).filter(Boolean));
+    render($("a"),a);render($("b"),b);
+    LAST=[a[0],b[0]].filter(Boolean).map(x=>x.raw);
     $("st").textContent="Uppdaterad "+hm(new Date());
   }catch(e){$("st").textContent="Fel: "+e.message+" (försöker igen)"}
 }
-let timer;let LAST=[];
-function dbg(){const e=$('dbg');if(e.style.display==='block'){e.style.display='none';return}e.textContent=JSON.stringify(LAST,(k,v)=>(k==='Product'||k==='ProductAtStop'||k==='JourneyDetailRef')?undefined:v,1).slice(0,3500);e.style.display='block'}
 function start(){
   clearInterval(timer);
   $("set").style.display=KEY?"none":"block";
