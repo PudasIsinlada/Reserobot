@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Öresundståg">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Öresundståg</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f14;--card:#161d26;--tx:#f2f5f8;--mu:#8b98a8;--ac:#4ea1ff;--bad:#ff6b6b;--ok:#5fd38d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.05em}
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.t{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums}
+.t s{font-size:20px;color:var(--bad);margin-right:6px;font-weight:500}
+.r{text-align:right;color:var(--mu);font-size:14px}
+.r b{display:block;font-size:20px;color:var(--ok)}
+.d{color:var(--mu);font-size:13px;margin-top:2px}
+#st{color:var(--mu);font-size:12px;text-align:center;margin-top:14px}
+#set{display:none}
+input{width:100%;padding:12px;border-radius:10px;border:0;background:var(--card);color:var(--tx);font-size:16px;margin:8px 0}
+button{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:600}
+a{color:var(--ac)}
+.lnk{background:none;color:var(--mu);font-size:12px;padding:6px;font-weight:400}
+</style>
+</head>
+<body>
+<div id="set">
+  <h2>Inställning</h2>
+  <p>Skaffa en gratis nyckel för <b>ResRobot – Resplanerare och Tidtabeller</b> på <a href="https://www.trafiklab.se">trafiklab.se</a> och klistra in den här.</p>
+  <input id="key" placeholder="API-nyckel" autocapitalize="off" autocorrect="off">
+  <button onclick="saveKey()">Spara</button>
+</div>
+<div id="app">
+  <h2>Halmstad → Göteborg</h2><div id="a"></div>
+  <h2>Göteborg → Halmstad</h2><div id="b"></div>
+  <div id="st"></div>
+  <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const BASE="https://api.resrobot.se/v2.1/";
+let KEY=null;
+try{KEY=localStorage.getItem("rr_key")}catch(e){}
+function saveKey(){KEY=$("key").value.trim();if(!KEY)return;try{localStorage.setItem("rr_key",KEY)}catch(e){}start()}
+function resetKey(){try{localStorage.removeItem("rr_key");localStorage.removeItem("rr_ids")}catch(e){}KEY=null;start()}
+async function getJSON(u){const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
+async function stopId(name){
+  let ids={};try{ids=JSON.parse(localStorage.getItem("rr_ids")||"{}")}catch(e){}
+  if(ids[name])return ids[name];
+  const j=await getJSON(`${BASE}location.name?input=${encodeURIComponent(name)}&format=json&accessId=${KEY}`);
+  const s=(j.stopLocationOrCoordLocation||[]).map(x=>x.StopLocation).find(Boolean);
+  if(!s)throw new Error("Hittar inte "+name);
+  ids[name]=s.extId;try{localStorage.setItem("rr_ids",JSON.stringify(ids))}catch(e){}
+  return s.extId;
+}
+async function board(name,keep){
+  const id=await stopId(name);
+  const j=await getJSON(`${BASE}departureBoard?id=${id}&format=json&accessId=${KEY}&duration=480&maxJourneys=60`);
+  const now=Date.now();
+  return (j.Departure||[]).filter(d=>{
+    const p=(d.ProductAtStop&&d.ProductAtStop.name||d.name||"")+" "+(d.ProductAtStop&&d.ProductAtStop.operator||"");
+    return /öresund/i.test(p)&&keep(d.direction||"")
+  }).map(d=>{
+    const sched=new Date(`${d.date}T${d.time}`);
+    const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
+    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,cancel:d.cancelled}
+  }).filter(d=>d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
+}
+const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
+function render(el,list){
+  if(!list.length){el.innerHTML='<div class="card"><span class="d">Inga avgångar hittades</span></div>';return}
+  el.innerHTML=list.map(d=>{
+    const min=Math.max(0,Math.round((d.real-Date.now())/60000));
+    const late=Math.round((d.real-d.sched)/60000);
+    return `<div class="card"><div><div class="t">${late>0?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div><div class="d">mot ${d.dir}${d.track?" · spår "+d.track:""}${d.cancel?" · INSTÄLLT":""}</div></div><div class="r"><b>${min<1?"nu":min+" min"}</b>${late>0?"+"+late+" min":""}</div></div>`
+  }).join("");
+}
+async function refresh(){
+  try{
+    const [a,b]=await Promise.all([
+      board("Halmstad C",x=>/göteborg/i.test(x)),
+      board("Göteborg C",x=>!/göteborg/i.test(x))
+    ]);
+    render($("a"),a);render($("b"),b);
+    $("st").textContent="Uppdaterad "+hm(new Date());
+  }catch(e){$("st").textContent="Fel: "+e.message+" (försöker igen)"}
+}
+let timer;
+function start(){
+  clearInterval(timer);
+  $("set").style.display=KEY?"none":"block";
+  $("app").style.display=KEY?"block":"none";
+  if(KEY){refresh();timer=setInterval(refresh,30000)}
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&KEY)refresh()});
+start();
+</script>
+</body>
+</html>
