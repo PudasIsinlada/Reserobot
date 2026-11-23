@@ -112,7 +112,7 @@ async function refresh(){
   }catch(e){$("st").textContent="Fel: "+e.message+" (försöker igen)"}
 }
 let timer;let LAST=[];
-function dbg(){const e=$('dbg');if(e.style.display==='block'){e.style.display='none';return}e.textContent=JSON.stringify(LAST,null,1).slice(0,3500);e.style.display='block'}
+function dbg(){const e=$('dbg');if(e.style.display==='block'){e.style.display='none';return}e.textContent=JSON.stringify(LAST,(k,v)=>(k==='Product'||k==='ProductAtStop'||k==='JourneyDetailRef')?undefined:v,1).slice(0,3500);e.style.display='block'}
 function start(){
   clearInterval(timer);
   $("set").style.display=KEY?"none":"block";
