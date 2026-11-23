@@ -43,7 +43,7 @@ a{color:var(--ac)}
   <h2>Halmstad → Göteborg</h2><div id="a"></div>
   <h2>Göteborg → Halmstad</h2><div id="b"></div>
   <div id="st"></div>
-  <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button></div>
+  <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button> <button class="lnk" onclick="dbg()">Visa rådata</button><pre id="dbg" style="display:none;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;color:var(--mu)"></pre></div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -70,7 +70,7 @@ function conv(raw,keep){
     const sched=new Date(`${d.date}T${d.time}`);
     const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
     const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t)&&DIS.test(t))n.push(t)});
-    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3)}
+    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3),raw:d}
   }).filter(d=>d.real.getTime()>=Date.now()-30000).sort((x,y)=>x.real-y.real).slice(0,2);
 }
 async function board(name,keep,dirName){
@@ -107,11 +107,12 @@ async function refresh(){
       board("Halmstad C",x=>/göteborg/i.test(x),"Göteborg C"),
       board("Göteborg C",x=>!/göteborg/i.test(x))
     ]);
-    render($("a"),a);render($("b"),b);
+    render($("a"),a);render($("b"),b);LAST=[a[0],b[0]].filter(Boolean).map(x=>x.raw);
     $("st").textContent="Uppdaterad "+hm(new Date());
   }catch(e){$("st").textContent="Fel: "+e.message+" (försöker igen)"}
 }
-let timer;
+let timer;let LAST=[];
+function dbg(){const e=$('dbg');if(e.style.display==='block'){e.style.display='none';return}e.textContent=JSON.stringify(LAST,null,1).slice(0,3500);e.style.display='block'}
 function start(){
   clearInterval(timer);
   $("set").style.display=KEY?"none":"block";
