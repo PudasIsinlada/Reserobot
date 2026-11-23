@@ -15,6 +15,12 @@ h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transfo
 .card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .t{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums}
 .t s{font-size:20px;color:var(--bad);margin-right:6px;font-weight:500}
+.st{font-size:15px;font-weight:600;margin-top:4px}
+.ok{color:var(--ok)}.warn{color:#ffb54d}.bad{color:var(--bad)}.gr{color:var(--mu)}
+.tr{background:#0b0f14;border-radius:10px;padding:6px 12px;text-align:center;margin-bottom:6px}
+.tr small{display:block;font-size:11px;color:var(--mu)}.tr b{font-size:26px}
+.nt{color:#ffb54d;font-size:12px;margin-top:6px;line-height:1.35}
+.card{flex-wrap:wrap}.card .nt{width:100%}
 .r{text-align:right;color:var(--mu);font-size:14px}
 .r b{display:block;font-size:20px;color:var(--ok)}
 .d{color:var(--mu);font-size:13px;margin-top:2px}
@@ -66,7 +72,8 @@ async function board(name,keep){
   }).map(d=>{
     const sched=new Date(`${d.date}T${d.time}`);
     const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
-    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,cancel:d.cancelled}
+    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t))n.push(t)});
+    return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3)}
   }).filter(d=>d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
 }
 const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
@@ -75,7 +82,15 @@ function render(el,list){
   el.innerHTML=list.map(d=>{
     const min=Math.max(0,Math.round((d.real-Date.now())/60000));
     const late=Math.round((d.real-d.sched)/60000);
-    return `<div class="card"><div><div class="t">${late>0?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div><div class="d">mot ${d.dir}${d.track?" · spår "+d.track:""}${d.cancel?" · INSTÄLLT":""}</div></div><div class="r"><b>${min<1?"nu":min+" min"}</b>${late>0?"+"+late+" min":""}</div></div>`
+    let st;
+    if(d.cancel)st='<div class="st bad">Inställt</div>';
+    else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
+    else if(d.rt)st='<div class="st ok">I tid</div>';
+    else st='<div class="st gr">Ingen realtidsinfo</div>';
+    const chg=d.track&&d.oldTrack&&d.track!==d.oldTrack;
+    const tr=d.track?`<div class="tr"><small>${chg?"ändrat spår":"spår"}</small><b>${d.track}</b></div>`:"";
+    const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
+    return `<div class="card"><div><div class="t">${late>=1?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div>${st}<div class="d">mot ${d.dir}</div></div><div class="r">${tr}<b>${d.cancel?"":(min<1?"nu":min+" min")}</b></div>${nt}</div>`
   }).join("");
 }
 async function refresh(){
