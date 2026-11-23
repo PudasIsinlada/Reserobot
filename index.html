@@ -72,10 +72,11 @@ async function board(name,keep){
   }).map(d=>{
     const sched=new Date(`${d.date}T${d.time}`);
     const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
-    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t))n.push(t)});
+    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t)&&!GEN.test(t))n.push(t)});
     return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3)}
   }).filter(d=>d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
 }
+const GEN=/reserver|klass|förordning|cykel|rullstol|handikapp|toalett|kafé|servering|wifi|wi-fi|uttag|tyst|barnvagn|husdjur|biljett|biljettköp|rese(garanti|ersättning)|^ej |^med /i;
 const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
 function render(el,list){
   if(!list.length){el.innerHTML='<div class="card"><span class="d">Inga avgångar hittades</span></div>';return}
@@ -86,7 +87,7 @@ function render(el,list){
     if(d.cancel)st='<div class="st bad">Inställt</div>';
     else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
     else if(d.rt)st='<div class="st ok">I tid</div>';
-    else st='<div class="st gr">Ingen realtidsinfo</div>';
+    else st='<div class="st gr">Planerad tid – ingen realtidsdata ännu</div>';
     const chg=d.track&&d.oldTrack&&d.track!==d.oldTrack;
     const tr=d.track?`<div class="tr"><small>${chg?"ändrat spår":"spår"}</small><b>${d.track}</b></div>`:"";
     const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
