@@ -62,21 +62,28 @@ async function stopId(name){
   ids[name]=s.extId;try{localStorage.setItem("rr_ids",JSON.stringify(ids))}catch(e){}
   return s.extId;
 }
-async function board(name,keep){
-  const id=await stopId(name);
-  const j=await getJSON(`${BASE}departureBoard?id=${id}&format=json&accessId=${KEY}&duration=480&maxJourneys=60`);
-  const now=Date.now();
-  return (j.Departure||[]).filter(d=>{
+function conv(raw,keep){
+  return raw.filter(d=>{
     const p=(d.ProductAtStop&&d.ProductAtStop.name||d.name||"")+" "+(d.ProductAtStop&&d.ProductAtStop.operator||"");
     return /öresund/i.test(p)&&keep(d.direction||"")
   }).map(d=>{
     const sched=new Date(`${d.date}T${d.time}`);
     const real=d.rtTime?new Date(`${d.rtDate||d.date}T${d.rtTime}`):sched;
-    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t)&&!GEN.test(t))n.push(t)});
+    const n=[];[].concat((d.Notes&&d.Notes.Note)||[],(d.Messages&&d.Messages.Message)||[]).forEach(x=>{const t=x.value||x.text||x.head;if(t&&!n.includes(t)&&DIS.test(t))n.push(t)});
     return{sched,real,dir:d.direction,track:d.rtTrack||d.track,oldTrack:d.track,cancel:d.cancelled,rt:!!d.rtTime,notes:n.slice(0,3)}
-  }).filter(d=>d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
+  }).filter(d=>d.real.getTime()>=Date.now()-30000).sort((x,y)=>x.real-y.real).slice(0,2);
 }
-const GEN=/reserver|klass|förordning|cykel|rullstol|handikapp|toalett|kafé|servering|wifi|wi-fi|uttag|tyst|barnvagn|husdjur|biljett|biljettköp|rese(garanti|ersättning)|^ej |^med /i;
+async function board(name,keep,dirName){
+  const id=await stopId(name);
+  const get=async q=>{const j=await getJSON(`${BASE}departureBoard?id=${id}&format=json&accessId=${KEY}&duration=720&maxJourneys=250${q}`);return j.Departure||[]};
+  if(dirName){
+    const did=await stopId(dirName);
+    const r=conv(await get("&direction="+did),()=>true);
+    if(r.length)return r;
+  }
+  return conv(await get(""),keep);
+}
+const DIS=/inställ|försen|ersätt|buss|störning|avvik|spårändr|ändrat|avbryt|banarbete|kortare|färre|skad|olycka|tidtabell|signalfel|fordonsfel|hastighet|stopp/i;
 const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
 function render(el,list){
   if(!list.length){el.innerHTML='<div class="card"><span class="d">Inga avgångar hittades</span></div>';return}
@@ -97,7 +104,7 @@ function render(el,list){
 async function refresh(){
   try{
     const [a,b]=await Promise.all([
-      board("Halmstad C",x=>/göteborg/i.test(x)),
+      board("Halmstad C",x=>/göteborg/i.test(x),"Göteborg C"),
       board("Göteborg C",x=>!/göteborg/i.test(x))
     ]);
     render($("a"),a);render($("b"),b);
