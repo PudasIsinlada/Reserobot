@@ -24,6 +24,9 @@ h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transfo
 .tr{background:#0b0f14;border-radius:10px;padding:6px 12px;text-align:center;margin-bottom:6px}
 .tr small{display:block;font-size:11px;color:var(--mu)}.tr b{font-size:26px;color:var(--tx)}
 .nt{color:#ffb54d;font-size:12px;margin-top:6px;line-height:1.35;width:100%}
+.pastbtn{display:block;width:100%;background:var(--card);color:var(--mu);font-size:14px;padding:10px;margin-bottom:10px;font-weight:500}
+.past{opacity:.7}.past .t{font-size:28px}
+.d a{color:var(--ac);text-decoration:none;font-weight:600}
 #st{color:var(--mu);font-size:12px;text-align:center;margin-top:14px}
 #set{display:none}
 input{width:100%;padding:12px;border-radius:10px;border:0;background:var(--card);color:var(--tx);font-size:16px;margin:8px 0}
@@ -62,7 +65,7 @@ async function q(xml){
   return res;
 }
 async function fetchDeps(sig){
-  const res=await q(`<REQUEST><LOGIN authenticationkey="${KEY}"/><QUERY objecttype="TrainAnnouncement" schemaversion="1.9" orderby="AdvertisedTimeAtLocation"><FILTER><AND><EQ name="ActivityType" value="Avgang"/><EQ name="LocationSignature" value="${sig}"/><GT name="AdvertisedTimeAtLocation" value="$dateadd(-00:30:00)"/><LT name="AdvertisedTimeAtLocation" value="$dateadd(12:00:00)"/></AND></FILTER><INCLUDE>AdvertisedTrainIdent</INCLUDE><INCLUDE>AdvertisedTimeAtLocation</INCLUDE><INCLUDE>EstimatedTimeAtLocation</INCLUDE><INCLUDE>TimeAtLocation</INCLUDE><INCLUDE>TrackAtLocation</INCLUDE><INCLUDE>Canceled</INCLUDE><INCLUDE>Deviation</INCLUDE><INCLUDE>ProductInformation</INCLUDE><INCLUDE>InformationOwner</INCLUDE><INCLUDE>ToLocation</INCLUDE></QUERY></REQUEST>`);
+  const res=await q(`<REQUEST><LOGIN authenticationkey="${KEY}"/><QUERY objecttype="TrainAnnouncement" schemaversion="1.9" orderby="AdvertisedTimeAtLocation"><FILTER><AND><EQ name="ActivityType" value="Avgang"/><EQ name="LocationSignature" value="${sig}"/><GT name="AdvertisedTimeAtLocation" value="$dateadd(-02:00:00)"/><LT name="AdvertisedTimeAtLocation" value="$dateadd(12:00:00)"/></AND></FILTER><INCLUDE>AdvertisedTrainIdent</INCLUDE><INCLUDE>AdvertisedTimeAtLocation</INCLUDE><INCLUDE>EstimatedTimeAtLocation</INCLUDE><INCLUDE>TimeAtLocation</INCLUDE><INCLUDE>TrackAtLocation</INCLUDE><INCLUDE>Canceled</INCLUDE><INCLUDE>Deviation</INCLUDE><INCLUDE>ProductInformation</INCLUDE><INCLUDE>InformationOwner</INCLUDE><INCLUDE>ToLocation</INCLUDE></QUERY></REQUEST>`);
   return res.TrainAnnouncement||[];
 }
 async function loadNames(sigs){
@@ -74,39 +77,57 @@ async function loadNames(sigs){
 }
 const isOre=d=>/öresund/i.test(JSON.stringify(d.ProductInformation||"")+" "+(d.InformationOwner||""));
 const toSigs=d=>(d.ToLocation||[]).slice().sort((x,y)=>(x.Order||0)-(y.Order||0)).map(x=>x.LocationName);
+let DATA={a:null,b:null},SHOW={a:false,b:false};
 function pick(raw,keep){
-  const now=Date.now();
-  return raw.filter(d=>isOre(d)&&keep(toSigs(d))&&!d.TimeAtLocation).map(d=>{
+  const now=Date.now(),H2=2*3600e3;
+  const all=raw.filter(d=>isOre(d)&&keep(toSigs(d))).map(d=>{
     const sched=new Date(d.AdvertisedTimeAtLocation);
-    const real=d.EstimatedTimeAtLocation?new Date(d.EstimatedTimeAtLocation):sched;
+    const actual=d.TimeAtLocation?new Date(d.TimeAtLocation):null;
+    const real=actual||(d.EstimatedTimeAtLocation?new Date(d.EstimatedTimeAtLocation):sched);
     const notes=[];(d.Deviation||[]).forEach(x=>{const t=x.Description||x;if(t&&typeof t==="string"&&!notes.includes(t))notes.push(t)});
     const s=toSigs(d);
-    return{sched,real,est:!!d.EstimatedTimeAtLocation,track:d.TrackAtLocation,cancel:!!d.Canceled,notes:notes.slice(0,3),dest:s[s.length-1],raw:d}
-  }).filter(d=>d.cancel?d.sched.getTime()>=now-60000:d.real.getTime()>=now-30000).sort((x,y)=>x.real-y.real).slice(0,2);
+    return{sched,real,actual,est:!!d.EstimatedTimeAtLocation,track:d.TrackAtLocation,cancel:!!d.Canceled,notes:notes.slice(0,3),dest:s[s.length-1],ident:d.AdvertisedTrainIdent,raw:d}
+  });
+  const isPast=d=>d.actual||(d.cancel?d.sched.getTime()<now-60000:d.real.getTime()<now-30000);
+  const past=all.filter(d=>isPast(d)&&d.sched.getTime()>=now-H2).sort((x,y)=>x.sched-y.sched);
+  const next=all.filter(d=>!isPast(d)).sort((x,y)=>x.real-y.real).slice(0,2);
+  return{past,next};
 }
 const hm=d=>d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});
-function render(el,list){
-  if(!list.length){el.innerHTML='<div class="card"><span class="d">Inga avgångar hittades</span></div>';return}
-  el.innerHTML=list.map(d=>{
-    const min=Math.max(0,Math.round((d.real-Date.now())/60000));
-    const late=Math.round((d.real-d.sched)/60000);
-    let st;
-    if(d.cancel)st='<div class="st bad">Inställt</div>';
-    else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
-    else if(d.est)st='<div class="st ok">I tid</div>';
-    else st='<div class="st gr">Ingen avvikelse rapporterad</div>';
-    const tr=d.track?`<div class="tr"><small>spår</small><b>${d.track}</b></div>`:"";
-    const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
-    return `<div class="card"><div><div class="t">${late>=1?`<s>${hm(d.sched)}</s>`:""}${hm(d.real)}</div>${st}<div class="d">mot ${NAMES[d.dest]||d.dest||""}</div></div><div class="r">${tr}<b>${d.cancel?"":(min<1?"nu":min+" min")}</b></div>${nt}</div>`
-  }).join("");
+function card(d,past){
+  const min=Math.max(0,Math.round((d.real-Date.now())/60000));
+  const late=Math.round((d.real-d.sched)/60000);
+  let st;
+  if(d.cancel)st='<div class="st bad">Inställt</div>';
+  else if(past){
+    if(d.actual){const l=Math.round((d.actual-d.sched)/60000);st=l>=1?`<div class="st warn">Avgick ${hm(d.actual)} (${l} min sen)</div>`:'<div class="st ok">Avgick i tid</div>'}
+    else st=`<div class="st gr">Avgick (prognos ${hm(d.real)})</div>`;
+  }
+  else if(late>=1)st=`<div class="st warn">Försenad ${late} min – väntas avgå ${hm(d.real)}</div>`;
+  else if(d.est)st='<div class="st ok">I tid</div>';
+  else st='<div class="st gr">Ingen avvikelse rapporterad</div>';
+  const tr=d.track?`<div class="tr"><small>spår</small><b>${d.track}</b></div>`:"";
+  const nt=d.notes.length?`<div class="nt">${d.notes.map(x=>"⚠ "+x.replace(/</g,"&lt;")).join("<br>")}</div>`:"";
+  const tn=d.ident?`<a href="https://www.trafikverket.se/trafikinformation/tag/?Train=${encodeURIComponent(d.ident)}" target="_blank" rel="noopener">Tåg ${String(d.ident).replace(/</g,"")}</a> · `:"";
+  const right=`${tr}${past||d.cancel?"":`<b>${min<1?"nu":min+" min"}</b>`}`;
+  return `<div class="card${past?" past":""}"><div><div class="t">${!past&&late>=1?`<s>${hm(d.sched)}</s>${hm(d.real)}`:hm(d.sched)}</div>${st}<div class="d">${tn}mot ${NAMES[d.dest]||d.dest||""}</div></div><div class="r">${right}</div>${nt}</div>`
 }
+function renderDir(k){
+  const D=DATA[k];if(!D)return;
+  let h="";
+  if(D.past.length)h+=`<button class="pastbtn" onclick="togglePast('${k}')">${SHOW[k]?"Dölj":"Visa"} tidigare avgångar (${D.past.length})</button>`;
+  if(SHOW[k])h+=D.past.map(d=>card(d,true)).join("");
+  h+=D.next.length?D.next.map(d=>card(d,false)).join(""):'<div class="card"><span class="d">Inga avgångar hittades</span></div>';
+  $(k).innerHTML=h;
+}
+function togglePast(k){SHOW[k]=!SHOW[k];renderDir(k)}
 async function refresh(){
   try{
     const [ra,rb]=await Promise.all([fetchDeps("Hd"),fetchDeps("G")]);
-    const a=pick(ra,s=>s.includes("G")),b=pick(rb,()=>true);
-    await loadNames([...a,...b].map(x=>x.dest).filter(Boolean));
-    render($("a"),a);render($("b"),b);
-    LAST=[a[0],b[0]].filter(Boolean).map(x=>x.raw);
+    DATA.a=pick(ra,s=>s.includes("G"));DATA.b=pick(rb,()=>true);
+    await loadNames([...DATA.a.next,...DATA.a.past,...DATA.b.next,...DATA.b.past].map(x=>x.dest).filter(Boolean));
+    renderDir("a");renderDir("b");
+    LAST=[DATA.a.next[0],DATA.b.next[0]].filter(Boolean).map(x=>x.raw);
     $("st").textContent="Uppdaterad "+hm(new Date());
   }catch(e){$("st").textContent="Fel: "+e.message+" (försöker igen)"}
 }
