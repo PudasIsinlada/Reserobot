@@ -11,7 +11,8 @@
 :root{color-scheme:dark;--bg:#0b0f14;--card:#161d26;--tx:#f2f5f8;--mu:#8b98a8;--ac:#4ea1ff;--bad:#ff6b6b;--ok:#5fd38d}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
-h2{font-size:15px;color:var(--mu);font-weight:600;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.05em}
+h2{font-size:18px;color:var(--ac);font-weight:700;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.05em;padding-left:10px;border-left:4px solid var(--ac)}
+.ers{margin-top:26px}.ers a{display:block;background:var(--card);border-radius:12px;padding:12px 14px;font-size:15px;font-weight:600;text-decoration:none}
 .card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
 .card>div:first-child{flex:1;min-width:0}
 .t{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -46,6 +47,7 @@ a{color:var(--ac)}
   <h2>Halmstad → Göteborg</h2><div id="a"></div>
   <h2>Göteborg → Halmstad</h2><div id="b"></div>
   <div id="st"></div>
+  <div class="ers"><h2>Förseningsersättning</h2><a href="https://www.hallandstrafiken.se/kundservice/vanliga-arenden/forseningsersattning-och-reklamation/forseningsersattning" target="_blank" rel="noopener">Ansök hos Hallandstrafiken →</a></div>
   <div style="text-align:center"><button class="lnk" onclick="resetKey()">Byt API-nyckel</button> <button class="lnk" onclick="dbg()">Visa rådata</button>
   <pre id="dbg" style="display:none;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;color:var(--mu)"></pre></div>
 </div>
